@@ -1,8 +1,8 @@
 # Classroom-Clock
 a clock designed for and by teachers
 
-[jdeboi.com][http://jdeboi.com/]
-[Instructable][http://www.instructables.com/editInstructable/edit/E8J84XOION6POZY/]
+[jdeboi.com](http://jdeboi.com/)
+[Instructable](http://www.instructables.com/editInstructable/edit/E8J84XOION6POZY/)
 ---
 The Classroom Clock is a clock designed and optimized for teachers. When I began teaching, I found it very difficult to keep track of the rotating block schedule. Classroom Clock solves this problem, in addition to offering several other convenient features:
 
