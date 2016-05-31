@@ -1,5 +1,5 @@
 # Classroom-Clock
-a clock designed for and by teachers
+a DIY digital clock designed for and by teachers
 
 
 [jdeboi.com](http://jdeboi.com/)  
