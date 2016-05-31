@@ -95,14 +95,14 @@ byte letters[] = {
 void setup() {
   Serial.begin(57600);
   initChronoDot();
-  delay(5000);
   strip.begin();
   strip.show();
+  delay(5000);
   now = RTC.now();
 }
 
 void loop() {
-  /*
+  
   for(int i = 0; i < 6*60; i++) {
     if(i%60 < 30) { 
       countdownClock(8*60*60+54*60+i,9*60*60);
@@ -110,7 +110,7 @@ void loop() {
     else colorClock(8,54+i/60,0,Wheel(50));
     delay(100);
   }
-  */
+  
   //showBlocks();
   //rainbowClock(10);
   //gradientClock();
@@ -118,7 +118,7 @@ void loop() {
   //xmasClock();
   //mardiGrasClock();
   //pulseClock(4,25,Wheel(100),5);
-  rainClock();
+  //rainClock();
 }
 
 
@@ -309,8 +309,7 @@ void gradientClock() {
     strip.show();
     unsigned long tt = millis();
     while(millis() - tt < 100) {
-      now = RTC.now();
-      displayColon(Wheel(c));
+      displayColon(c);
       strip.show();
     }
   }
