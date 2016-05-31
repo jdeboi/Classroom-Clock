@@ -32,7 +32,7 @@
 
 /////////////////////////////////////////////////////////
 // SET THIS
-int currentBlock = B_BLOCK;
+int currentBlock = A_BLOCK;
 /////////////////////////////////////////////////////////
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, PIN, NEO_GRB + NEO_KHZ800);
@@ -95,24 +95,32 @@ byte letters[] = {
 void setup() {
   Serial.begin(57600);
   initChronoDot();
-  setPeriod();
+  delay(5000);
   strip.begin();
   strip.show();
+  now = RTC.now();
 }
 
 void loop() {
-  now = RTC.now();
-  displayClock();
-  checkBlock();
+  /*
+  for(int i = 0; i < 6*60; i++) {
+    if(i%60 < 30) { 
+      countdownClock(8*60*60+54*60+i,9*60*60);
+    }
+    else colorClock(8,54+i/60,0,Wheel(50));
+    delay(100);
+  }
+  */
+  //showBlocks();
+  //rainbowClock(10);
+  //gradientClock();
+  //birthdayClock(200);
+  //xmasClock();
+  //mardiGrasClock();
+  //pulseClock(4,25,Wheel(100),5);
+  rainClock();
 }
 
-void printClock() {
-  Serial.print(now.hour()); 
-  Serial.print(":"); 
-  Serial.print(now.minute()); 
-  Serial.print(":"); 
-  Serial.println(now.second());
-}
 
 
 /////////////////////////////////////////////////////////
@@ -142,198 +150,71 @@ void initChronoDot() {
   Serial.println("Setup complete.");
 }
 
-uint8_t getLetter() {
-  if (isAfterSchool()) return 10;
-  return currentBlock;
-}
 
-void setPeriod() {
-  currentPeriod = 0;
-  for (int i = 6; i >= 0; i--) {
-    if (isBeforeTime(now.hour(), now.minute(), periods[i][2], periods[i][3])) {
-      currentPeriod = i;
-    }
-  }
-}
-
-void nextDay() {
-  if (isSchoolDay()) {
-    currentPeriod = 0;
-    currentBlock++;
-    if (currentBlock == 8) currentBlock = 0;
-  }
-}
-
-
-/////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////
-// CHECK
-/////////////////////////////////////////////////////////
-void checkBlock() {
-  if(currentPeriod < 6) {
-    uint8_t h = periods[currentPeriod][2];
-    uint8_t m = periods[currentPeriod][3];
-    if(isAfterTime(now.hour(), now.minute(), h, m)) {
-      currentPeriod++;
-      currentBlock++;
-      if(currentBlock == 8) currentBlock = 0;
-    }
-  }
-}
-
-boolean isBeforeTime(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
-  if(timeDiff(h0,m0,h1,m1) > 0) return true;
-  return false;
-}
-
-boolean isAfterTime(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
-  if(timeDiff(h0,m0,h1,m1) < 0) return true;
-  return false;
-}
-
-uint16_t timeDiff(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
-  uint16_t t0 = h0*60+m0;
-  uint16_t t1 = h1*60+m1;
-  return t1 - t0;
-}
-
-boolean isEndFlash() {
-  uint8_t h = periods[currentPeriod][2];
-  uint8_t m = periods[currentPeriod][3];
-  if(timeDiff(now.hour(), now.minute(), h, m)  < 10) {
-    if(now.unixtime() - lastFlash.unixtime() > 4) {
-      lastFlash = now;
-      flashOn = !flashOn;
-    }
-    return flashOn;
-  }
-  return false;
-}
-
-boolean isSchoolDay() {
-  if (now.dayOfWeek() > 4) return false;
-  else if (isVacation()) return false;
-  return true;
-}
-
-boolean isDuringSchool() {
-  if (isSchoolDay() && !isAfterSchool()) return true;
-  return false;
-}
-
-boolean isVacation() {
-  for (int i = 0; i < numVacations; i++) {
-    if(now.year() == vacations[i][0] && now.month() == vacations[i][1] && now.day() == vacations[i][2]) {
-      return true;
-    }
-  }
-  return false;
-}
-
-boolean isBetweenTime(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
-  DateTime startTime (now.year(), now.month(), now.day(), h0, m0, 0);
-  DateTime endTime (now.year(), now.month(), now.day(), h1, m1, 0);
-  if(now.unixtime() > startTime.unixtime() && now.unixtime() < endTime.unixtime()) {
-    return true;
-  }
-  return false;
-}
-
-boolean isAssembly() {
-  return isBetweenTime(9, 48, 10, 18);
-}
-
-boolean isLunch() {
-  return isBetweenTime(12, 39, 13, 24);
-}
-
-boolean isAfterSchool() {
-  if (now.hour() >= 15) return true;
-  return false;
-}
-
-boolean isEndOfDay() {
-  boolean changed = false;
-  if (now.hour() == 0 && lastHour == 23) {
-    changed = true;
-  }
-  lastHour = now.hour();
-  return changed;
-}
-
-boolean isBeforeSchool() {
-  if (now.hour() < 8) return true;
-  return false;
-}
-
-boolean isHourChange() {
-  if (now.minute() == 0 && now.second() < 15) return true;
-  return false;
-}
-
-boolean isEnd() {
-  uint8_t h = periods[currentPeriod][2];
-  uint8_t m = periods[currentPeriod][3];
-  DateTime endTime (now.year(), now.month(), now.day(), h, m, 0);
-  if(endTime.unixtime() - now.unixtime()  < 7*60) return true;
-  return false;
-}
 
 
 /////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
 // DISPLAY
 /////////////////////////////////////////////////////////
-void displayClock() {
-  if(isEndOfDay()) nextDay();
-  else if (now.dayOfWeek() > 4) pulseClock(Wheel(250),10);
-  else if (isBeforeSchool()) colorClock(Wheel(240));
-  else if (isAfterSchool()) pulseClock(Wheel(100),5);
-  else if (isEndFlash()) countdownClock(); 
-  else if (isLunch()) pulseClock(Wheel(100),5);
-  else if (isAssembly()) rainbowClock(5);
-  else gradientClock();
+
+void showBlocks() {
+  int i = 0;
+  long lastTime = millis();
+  while (i < 10) {
+    displayHour(now.hour(), Wheel(240));
+    displayMinute(now.minute(), Wheel(240));
+    displayLetter(i, Wheel(180));
+    displayColon(Wheel(240));
+    if(millis() > lastTime+500) {
+      i++;
+      lastTime = millis();
+    }
+    strip.show();
+  }
 }
 
 void displayColon(uint32_t c) {
+  now = RTC.now();
   if (now.second() % 2 == 0) {
+    Serial.print("r=0");
+    Serial.println(now.second());
     strip.setPixelColor(21, c);
     strip.setPixelColor(22, c);
   }
   else {
+    Serial.print("r=1");
+    Serial.println(now.second());
     strip.setPixelColor(21, 0);
     strip.setPixelColor(22, 0);
   }
 }
 
-void countdownClock() {
-  uint8_t h = periods[currentPeriod][2];
-  uint8_t m = periods[currentPeriod][3];
-  DateTime endTime(now.year(), now.month(), now.day(), h, m, 0);
-  uint8_t minLeft = (endTime.unixtime() - now.unixtime())/60;
-  uint8_t secLeft = endTime.unixtime() - now.unixtime();
-  //Serial.println(minLeft);
-  if(minLeft == 0) displayHour(minLeft, 0);
+void countdownClock(long currentTime, long endTime) {
+  uint8_t minLeft = (endTime-currentTime)/60;
+  uint8_t secLeft = (endTime - currentTime)%60;
+
+  if(minLeft == 0) displayHour(0, 0);
   else displayHour(minLeft, Wheel(190));
   displayMinute(secLeft, Wheel(190));
-  displayLetter(getLetter(), Wheel(190));
+  displayLetter(1, Wheel(190));
   displayColon(Wheel(190));
   strip.show();
 }
 
-void colorClock(int c) {
-  displayHour(now.hour(), Wheel(c));
-  displayMinute(now.minute(), Wheel(c));
-  displayLetter(getLetter(), Wheel(c));
+void colorClock(int h, int m, int l, int c) {
+  displayHour(h, Wheel(c));
+  displayMinute(m, Wheel(c));
+  displayLetter(l, Wheel(c));
   displayColon(Wheel(c));
   strip.show();
 }
 
 void rainbowClock(int delayTime) {
   for (int j = 0; j < 256; j++) {
-    displayHour(now.hour(), Wheel(j));
-    displayMinute(now.minute(), Wheel(j));
-    displayLetter(getLetter(), Wheel(j));
+    displayHour(12, Wheel(j));
+    displayMinute(15, Wheel(j));
+    displayLetter(10, Wheel(j));
     displayColon(Wheel(j));
     strip.show();
     unsigned long t = millis();
@@ -344,20 +225,54 @@ void rainbowClock(int delayTime) {
   }
 }
 
-void randoClock(int delayTime) {
+void birthdayClock(int delayTime) {
   displayHour(now.hour(), Wheel(random(0,255)));
   displayMinute(now.minute(), Wheel(random(0,255)));
-  displayLetter(getLetter(), Wheel(random(0,255)));
+  displayLetter(0, Wheel(random(0,255)));
   displayColon(Wheel(random(0,255)));
   unsigned long t = millis();
+  strip.show();
   while(millis() - t < delayTime) displayColon(Wheel(random(0,255)));
 }
 
-void pulseClock(uint32_t col, int delayTime) {
+void xmasClock() {
+  displayHour(now.hour(), Wheel(0));
+  displayMinute(now.minute(), Wheel(80));
+  displayLetter(1, Wheel(0));
+  displayColon(Wheel(0));
+  strip.show();
+}
+
+void rainClock() {
+  if(now.second()&2 == 0) {
+    displayHour(now.hour(), Wheel(0));
+    displayMinute(now.minute(), Wheel(80));
+    displayLetter(1, Wheel(100));
+    displayColon(Wheel(50));
+  }
+  else {
+    displayHour(now.hour(), 0);
+    displayMinute(now.minute(), 0);
+    displayLetter(1, 0);
+    displayColon(0);
+  }
+  strip.show();
+}
+
+void mardiGrasClock() {
+  displayHour(now.hour(), Wheel(200));
+  displayMinute(now.minute(), Wheel(80));
+  displayLetter(0, Wheel(50));
+  displayColon(Wheel(50));
+  strip.show();
+}
+
+void pulseClock(int h, int m, uint32_t col, int delayTime) {
   for (int j = 255; j >= 0; j--) {
-    displayHour(now.hour(), col);
-    displayMinute(now.minute(), col);
-    displayLetter(getLetter(), col);
+    now = RTC.now();
+    displayHour(h, col);
+    displayMinute(m, col);
+    displayLetter(4, col);
     displayColon(col);
     strip.setBrightness(j);
     strip.show();
@@ -368,9 +283,9 @@ void pulseClock(uint32_t col, int delayTime) {
     }
   }
   for (int j = 0; j < 256; j++) {
-    displayHour(now.hour(), col);
-    displayMinute(now.minute(), col);
-    displayLetter(getLetter(), col);
+    displayHour(h, col);
+    displayMinute(m, col);
+    displayLetter(4, col);
     displayColon(col);
     strip.setBrightness(j);
     strip.show();
@@ -383,24 +298,23 @@ void pulseClock(uint32_t col, int delayTime) {
 }
 
 void gradientClock() {
-  uint32_t c = Wheel(getGradientColor(now.hour(), now.minute()));
-  displayHour(now.hour(), c);
-  displayMinute(now.minute(), c);
-  displayColon(c);
-  displayLetter(getLetter(), c);
-  strip.show();
-}
-
-int getGradientColor(uint8_t h, uint8_t m) {
-  // DateTime (year, month, day, hour, min, sec);
-  uint8_t h0 = periods[currentPeriod][0];
-  uint8_t m0 = periods[currentPeriod][1];
-  uint8_t h1 = periods[currentPeriod][2];
-  uint8_t m1 = periods[currentPeriod][3];
-  DateTime startTime(now.year(),now.month(),now.day(),h0,m0,0);
-  DateTime endTime(now.year(),now.month(),now.day(),h1,m1,0); 
-  if(now.unixtime() < startTime.unixtime()) return 200;
-  else return map(now.unixtime(), startTime.unixtime(), endTime.unixtime(), 80, 0);
+  int h = 8;
+  for(int i = 0; i < 60; i++) {
+    uint8_t t = map(h*60+i, 8*60, 9*60, 80, 0);
+    uint32_t c = Wheel(t);
+    displayHour(h, c);
+    displayMinute(i, c);
+    displayColon(c);
+    displayLetter(4, c);
+    strip.show();
+    unsigned long tt = millis();
+    while(millis() - tt < 100) {
+      now = RTC.now();
+      displayColon(Wheel(c));
+      strip.show();
+    }
+  }
+  delay(3000);
 }
 
 void displayHour(uint8_t h, uint32_t col) {

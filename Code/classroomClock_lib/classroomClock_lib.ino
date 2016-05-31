@@ -23,15 +23,18 @@
 #include <Wire.h>
 #include <SPI.h>
 #include "RTClib.h"               // https://github.com/adafruit/RTClib
+#include "Period.h" 
 #include <RTC_DS1307.h>
 #include <avr/power.h>
 #include <Adafruit_NeoPixel.h>    // https://github.com/adafruit/Adafruit_NeoPixel
+
 
 #define PIN 3
 #define NUM_PIXELS 32
 
 /////////////////////////////////////////////////////////
-// SET THIS
+// SET THESE
+#define NUM_PERIODS 7
 int currentBlock = B_BLOCK;
 /////////////////////////////////////////////////////////
 
@@ -49,16 +52,22 @@ uint16_t vacations[numVacations][3] = {
   {2016, 9, 23}
 };
 
-uint8_t periods[7][4] = {
-  {8, 0, 9, 0},   // Period 0: 8 - 9
-  {9, 3, 9, 48},  // Period 1: 9:03 - 9:48
-  // Assembly: 9:48 - 10:18
-  {10, 18, 11, 3}, // Period 2: 10:18 - 11:03
-  {11, 6, 11, 51}, // Period 3: 11:06 - 11:51
-  {11, 54, 12, 39}, // Period 4: 11:54 - 12:39
-  // Lunch: 12:39 - 1:24
-  {13, 27, 14, 12}, // Period 5: 1:27 - 2:12
-  {14, 15, 15, 0} // Period 6: 2:15 - 3:00
+Period periods[] = {
+  Period(8, 0, AM, 9, 0, AM, "MTWThF"),         //Period 1 
+  Period(9, 3, AM, 9, 48, AM, "MTWThF"),        //Period 2 
+  // Assembly: 9:48 - 10:18AM 
+  Period(10, 18, AM, 11, 3, AM, "MTWThF"),      //Period 3 
+  Period(11, 3, AM, 11, 51, AM, "MTWThF"),      //Period 4 
+  Period(11, 54, AM, 12, 39, PM, "MTWThF"),     //Period 5 
+   // Lunch: 12:39 - 1:24PM
+  Period(1, 27, PM, 2, 12, PM, "MTWThF"),        //Period 6 
+  Period(2, 15, PM, 3, 0, PM, "MTWThF")        //Period 7 
+
+  // TTh
+  Period(2, 15, PM, 3, 0, PM, "MTWThF")        //Period 7 
+  Period(2, 15, PM, 3, 0, PM, "MTWThF")        //Period 7 
+  Period(2, 15, PM, 3, 0, PM, "MTWThF")        //Period 7 
+  Period(2, 15, PM, 3, 0, PM, "MTWThF")        //Period 7 
 };
 
 byte numbers[] = {
@@ -79,10 +88,10 @@ byte letters[] = {
   B11110010,    // B     6     4
   B01110000,    // C     6     4
   B11111000,    // D      33333
-  B01110110,    // E     2     0
+  B01101110,    // E     2     0
   B00110110,    // F     2     0
   B11011110,    // G      11111
-  B10111010,    // H
+  B10110110,    // H
   B01100010,    // L
   B00000000     //
 };
@@ -95,6 +104,7 @@ byte letters[] = {
 void setup() {
   Serial.begin(57600);
   initChronoDot();
+  initPeriods();
   setPeriod();
   strip.begin();
   strip.show();
@@ -392,15 +402,8 @@ void gradientClock() {
 }
 
 int getGradientColor(uint8_t h, uint8_t m) {
-  // DateTime (year, month, day, hour, min, sec);
-  uint8_t h0 = periods[currentPeriod][0];
-  uint8_t m0 = periods[currentPeriod][1];
-  uint8_t h1 = periods[currentPeriod][2];
-  uint8_t m1 = periods[currentPeriod][3];
-  DateTime startTime(now.year(),now.month(),now.day(),h0,m0,0);
-  DateTime endTime(now.year(),now.month(),now.day(),h1,m1,0); 
-  if(now.unixtime() < startTime.unixtime()) return 200;
-  else return map(now.unixtime(), startTime.unixtime(), endTime.unixtime(), 80, 0);
+  if(getNow() < periods[currentPeriod].getStart()) return 200;
+  else return map(now.unixtime(), periods[currentPeriod].getStart(), periods[currentPeriod].getEnd(), 80, 0);
 }
 
 void displayHour(uint8_t h, uint32_t col) {
@@ -477,6 +480,8 @@ uint32_t Wheel(byte WheelPos) {
   }
 }
 
-
+uint16_t getNow() {
+  return now.hour()*60+now.minute();
+}
 
 
