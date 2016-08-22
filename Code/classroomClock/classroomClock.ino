@@ -73,6 +73,8 @@ uint8_t otherBlocks[numOtherBlocks][4] = {
 const uint8_t assemblyBlock = 0;
 const uint8_t lunchBlock = 1; 
 
+uint8_t countdownM = 6; // number of minutes before end of class when 
+                        // countdown clock is triggered
 /////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
 
@@ -220,7 +222,7 @@ uint16_t timeDiff(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
 boolean isEndFlash() {
   uint8_t h = classPeriods[currentPeriod][2];
   uint8_t m = classPeriods[currentPeriod][3];
-  if(timeDiff(now.hour(), now.minute(), h, m)  < 6) {
+  if(timeDiff(now.hour(), now.minute(), h, m)  < countdownM) {
     if(now.unixtime() - lastFlash.unixtime() > 4) {
       lastFlash = now;
       flashOn = !flashOn;
@@ -253,10 +255,7 @@ boolean isDuringSchool() {
 boolean isBetweenTime(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
   DateTime startTime (now.year(), now.month(), now.day(), h0, m0, 0);
   DateTime endTime (now.year(), now.month(), now.day(), h1, m1, 0);
-  if(now.unixtime() > startTime.unixtime() && now.unixtime() < endTime.unixtime()) {
-    return true;
-  }
-  return false;
+  return (now.unixtime() >= startTime.unixtime() && now.unixtime() < endTime.unixtime());
 }
 
 boolean isAssembly() {
@@ -307,10 +306,21 @@ boolean isWeekend() {
   return now.dayOfWeek() > 4;
 }
 
+boolean isDuringClass() {
+  for (int i = 0; i < numPeriods; i++ ) {
+    if (isBetweenTime(classPeriods[i][0], classPeriods[i][2],classPeriods[i][3], classPeriods[i][4])) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
 // DISPLAY
 /////////////////////////////////////////////////////////
+
+// EDIT these to customize light effects
 void displayClock() {
   if(isEndOfDay()) nextDay();
   else if (isWeekend()) pulseClock(Wheel(250),10);
@@ -319,7 +329,8 @@ void displayClock() {
   else if (isEndFlash()) countdownClock(); 
   else if (isLunch()) pulseClock(Wheel(100),5);
   else if (isAssembly()) rainbowClock(5);
-  else gradientClock();
+  else if (isDuringClass()) gradientClock();
+  else colorClock(Wheel(20));
 }
 
 void displayColon(uint32_t c) {
