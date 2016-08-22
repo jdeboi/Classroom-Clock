@@ -1,6 +1,7 @@
 /////////////////////////////////////////////////////////
 /*
   Jenna deBoisblanc
+  2016
   http://jdeboi.com/
 
   CLASSROOM CLOCK
@@ -29,9 +30,50 @@
 #define PIN 3
 #define NUM_PIXELS 32
 
+struct timeBlock {
+  int startH;
+  int endH;
+  int startM;
+  int endM;
+};
+
 /////////////////////////////////////////////////////////
-// SET THIS
-int currentBlock = H_BLOCK;
+/////////////////////////////////////////////////////////
+// EDIT THESE
+/////////////////////////////////////////////////////////
+uint8_t currentBlock = H_BLOCK;   // setup for a rotating block schedule
+
+const uint8_t numPeriods = 7;     // this number should match the number
+                                  // of entries in classPeriods[]
+                                  
+uint8_t classPeriods[numPeriods][4] = {
+  // use 24 hour clock numbers even though this clock is a 12 hour clock
+  // {starting hour, start min, end hour, end min}
+  {8, 0, 9, 0},       // Period 0: 8 - 9
+  {9, 3, 9, 48},      // Period 1: 9:03 - 9:48
+                      // Assembly: 9:48 - 10:18
+  {10, 18, 11, 3},    // Period 2: 10:18 - 11:03
+  {11, 6, 11, 51},    // Period 3: 11:06 - 11:51
+  {11, 54, 12, 39},   // Period 4: 11:54 - 12:39
+                      // Lunch: 12:39 - 1:24
+  {13, 27, 14, 12},   // Period 5: 1:27 - 2:12
+  {14, 15, 15, 0}     // Period 6: 2:15 - 3:00
+};
+
+const uint8_t numOtherBlocks = 2;   // this number should match the number
+                                    // of entries in otherBlocks[]
+
+uint8_t otherBlocks[numOtherBlocks][4] = {
+  {9, 48, 10, 18},   // assembly: 9:48 - 10:18
+  {12, 39, 13, 24}  // Lunch: 12:39 - 1:24
+};
+
+// the next two values probably don't need to be changed
+// they represent their index in the otherBlocks array 
+const uint8_t assemblyBlock = 0;
+const uint8_t lunchBlock = 1; 
+
+/////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, PIN, NEO_GRB + NEO_KHZ800);
@@ -41,19 +83,6 @@ uint8_t currentPeriod = 0;
 uint8_t lastHour = 0;
 DateTime lastFlash;    // for countdown "flash"
 boolean flashOn = false;
-
-uint8_t periods[7][4] = {
-  {8, 0, 9, 0},   // Period 0: 8 - 9
-  {9, 3, 9, 48},  // Period 1: 9:03 - 9:48
-  // Assembly: 9:48 - 10:18
-  {10, 18, 11, 3}, // Period 2: 10:18 - 11:03
-  {11, 6, 11, 51}, // Period 3: 11:06 - 11:51
-  {11, 54, 12, 39}, // Period 4: 11:54 - 12:39
-  // Lunch: 12:39 - 1:24
-  {13, 27, 14, 12}, // Period 5: 1:27 - 2:12
-  {14, 15, 15, 0} // Period 6: 2:15 - 3:00
-};
-
 byte numbers[] = {
   B11101110,    // 0
   B10001000,    // 1
@@ -66,7 +95,6 @@ byte numbers[] = {
   B11111110,    // 8
   B10011110    // 9
 };
-
 byte letters[] = {
   B10111110,    // A      55555
   B11110010,    // B     6     4
@@ -80,7 +108,6 @@ byte letters[] = {
   B00000000     //
 };
 
-
 /////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
 // THE GUTS
@@ -91,7 +118,7 @@ void setup() {
   setPeriod();
   strip.begin();
   strip.show();
-  delay(5000);
+  delay(5000);  
 }
 
 void loop() {
@@ -107,7 +134,6 @@ void printClock() {
   Serial.print(":"); 
   Serial.println(now.second());
 }
-
 
 /////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
@@ -144,7 +170,7 @@ uint8_t getLetter() {
 void setPeriod() {
   currentPeriod = 0;
   for (int i = 6; i >= 0; i--) {
-    if (isBeforeTime(now.hour(), now.minute(), periods[i][2], periods[i][3])) {
+    if (isBeforeTime(now.hour(), now.minute(), classPeriods[i][2], classPeriods[i][3])) {
       currentPeriod = i;
     }
   }
@@ -165,8 +191,8 @@ void nextDay() {
 /////////////////////////////////////////////////////////
 void checkBlock() {
   if(currentPeriod < 6) {
-    uint8_t h = periods[currentPeriod][2];
-    uint8_t m = periods[currentPeriod][3];
+    uint8_t h = classPeriods[currentPeriod][2];
+    uint8_t m = classPeriods[currentPeriod][3];
     if(isAfterTime(now.hour(), now.minute(), h, m)) {
       currentPeriod++;
       currentBlock++;
@@ -192,8 +218,8 @@ uint16_t timeDiff(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
 }
 
 boolean isEndFlash() {
-  uint8_t h = periods[currentPeriod][2];
-  uint8_t m = periods[currentPeriod][3];
+  uint8_t h = classPeriods[currentPeriod][2];
+  uint8_t m = classPeriods[currentPeriod][3];
   if(timeDiff(now.hour(), now.minute(), h, m)  < 6) {
     if(now.unixtime() - lastFlash.unixtime() > 4) {
       lastFlash = now;
@@ -234,16 +260,23 @@ boolean isBetweenTime(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
 }
 
 boolean isAssembly() {
-  return isBetweenTime(9, 48, 10, 18);
+  return isBetweenTime(otherBlocks[assemblyBlock][0], otherBlocks[assemblyBlock][2], otherBlocks[assemblyBlock][3], otherBlocks[assemblyBlock][4]);
 }
 
 boolean isLunch() {
-  return isBetweenTime(12, 39, 13, 24);
+  return isBetweenTime(otherBlocks[lunchBlock][0], otherBlocks[lunchBlock][2], otherBlocks[lunchBlock][3], otherBlocks[lunchBlock][4]);
 }
 
 boolean isAfterSchool() {
-  if (now.hour() >= 15) return true;
-  return false;
+  // You may need to edit these values if school ends with a homeroom or
+  // otherBlock[] that isn't a classperiod[]
+  return (now.hour() >= classPeriods[numPeriods-1][2] && now.minute() >=  classPeriods[numPeriods-1][3]);
+}
+
+boolean isBeforeSchool() {
+  // You may need to edit these values if school begins with a homeroom or
+  // otherBlock[] that isn't a classperiod[]
+  return (now.hour() <= classPeriods[0][0] && now.minute() < classPeriods[0][1]);
 }
 
 boolean isEndOfDay() {
@@ -255,10 +288,7 @@ boolean isEndOfDay() {
   return changed;
 }
 
-boolean isBeforeSchool() {
-  if (now.hour() < 8) return true;
-  return false;
-}
+
 
 boolean isHourChange() {
   if (now.minute() == 0 && now.second() < 15) return true;
@@ -266,13 +296,16 @@ boolean isHourChange() {
 }
 
 boolean isEnd() {
-  uint8_t h = periods[currentPeriod][2];
-  uint8_t m = periods[currentPeriod][3];
+  uint8_t h = classPeriods[currentPeriod][2];
+  uint8_t m = classPeriods[currentPeriod][3];
   DateTime endTime (now.year(), now.month(), now.day(), h, m, 0);
   if(endTime.unixtime() - now.unixtime()  < 7*60) return true;
   return false;
 }
 
+boolean isWeekend() {
+  return now.dayOfWeek() > 4;
+}
 
 /////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
@@ -289,10 +322,6 @@ void displayClock() {
   else gradientClock();
 }
 
-boolean isWeekend() {
-  return now.dayOfWeek() > 4;
-}
-
 void displayColon(uint32_t c) {
   if (now.second() % 2 == 0) {
     strip.setPixelColor(21, c);
@@ -305,8 +334,8 @@ void displayColon(uint32_t c) {
 }
 
 void countdownClock() {
-  uint8_t h = periods[currentPeriod][2];
-  uint8_t m = periods[currentPeriod][3];
+  uint8_t h = classPeriods[currentPeriod][2];
+  uint8_t m = classPeriods[currentPeriod][3];
   DateTime endTime(now.year(), now.month(), now.day(), h, m, 0);
   uint8_t minLeft = (endTime.unixtime() - now.unixtime())/60;
   uint8_t secLeft = endTime.unixtime() - now.unixtime();
@@ -390,10 +419,10 @@ void gradientClock() {
 
 int getGradientColor(uint8_t h, uint8_t m) {
   // DateTime (year, month, day, hour, min, sec);
-  uint8_t h0 = periods[currentPeriod][0];
-  uint8_t m0 = periods[currentPeriod][1];
-  uint8_t h1 = periods[currentPeriod][2];
-  uint8_t m1 = periods[currentPeriod][3];
+  uint8_t h0 = classPeriods[currentPeriod][0];
+  uint8_t m0 = classPeriods[currentPeriod][1];
+  uint8_t h1 = classPeriods[currentPeriod][2];
+  uint8_t m1 = classPeriods[currentPeriod][3];
   DateTime startTime(now.year(),now.month(),now.day(),h0,m0,0);
   DateTime endTime(now.year(),now.month(),now.day(),h1,m1,0); 
   // not working if(now.unixtime() < startTime.unixtime()) return 200;
