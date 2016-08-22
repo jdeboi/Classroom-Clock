@@ -96,6 +96,11 @@ boolean isBeforeSchool() {
 ```
 There's probably other code editing you'll have to do for these types of schedule modifications. Please let me know (or submit pull requests) as your run into problems specific to your use case.
 
+To set the number of minutes before the countdown timer triggered, edit:
+
+```c++
+uint8_t countdownM = 6;
+```
 
 ## Editing Clock Display
 The other main section of code that you'll have to edit is the display clock section:
@@ -114,9 +119,31 @@ void displayClock() {
 }
 ```
 
-To get rid of the countdown timer triggered at the end of the class, comment out ("//") the following line:
+To get rid of the countdown timer triggered at the end of the class, comment out ("//") the countdownClock() line:
 
 ```c++
-//else if (isEndFlash()) countdownClock(); 
+void displayClock() {
+  if(isEndOfDay()) nextDay();
+  else if (isWeekend()) pulseClock(Wheel(250),10);
+  else if (isBeforeSchool()) colorClock(Wheel(240));
+  else if (isAfterSchool()) pulseClock(Wheel(100),5);
+  //else if (isEndFlash()) countdownClock(); 
+  else if (isLunch()) pulseClock(Wheel(100),5);
+  else if (isAssembly()) rainbowClock(5);
+  else if (isDuringClass()) gradientClock();
+  else colorClock(Wheel(20));
+}
 ```
+
+You can change the light effect by changing the function after the else if. Possible options include: colorClock(), pulseClock(), randoClock(), rainbowClock(), mardiGrasClock(), etc. Check the code for examples.
+
+You can change colors of some clocks (colorClock(), pulseClock, colorClock()) by changing the number in Wheel(). 0 is red and 255 is purple; experiment with values in between. 
+
+The number passed to rainbowClock() represents the speed that it cycles through the colors of the rainbow.
+
+countdownClock(), gradientClock(), xMasClock(), mardiGrasClock(), birthdayClock(), etc. don't take arguments (i.e. no values passed inside the parentheses).
+
+pulseCock() takes a color (passed inside Wheel()), and a number representing the amount of time to wait between pulses.
+
+Add your own functions! Feel free to do a pull request to add your functionality to the Classroom Clock!
 

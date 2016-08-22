@@ -381,6 +381,32 @@ void rainbowClock(int delayTime) {
   }
 }
 
+void birthdayClock(int delayTime) {
+  displayHour(now.hour(), Wheel(random(0,255)));
+  displayMinute(now.minute(), Wheel(random(0,255)));
+  displayLetter(0, Wheel(random(0,255)));
+  displayColon(Wheel(random(0,255)));
+  unsigned long t = millis();
+  strip.show();
+  while(millis() - t < delayTime) displayColon(Wheel(random(0,255)));
+}
+
+void xmasClock() {
+  displayHour(now.hour(), Wheel(0));
+  displayMinute(now.minute(), Wheel(80));
+  displayLetter(1, Wheel(0));
+  displayColon(Wheel(0));
+  strip.show();
+}
+
+void mardiGrasClock() {
+  displayHour(now.hour(), Wheel(200));
+  displayMinute(now.minute(), Wheel(80));
+  displayLetter(0, Wheel(50));
+  displayColon(Wheel(50));
+  strip.show();
+}
+
 void randoClock(int delayTime) {
   displayHour(now.hour(), Wheel(random(0,255)));
   displayMinute(now.minute(), Wheel(random(0,255)));
