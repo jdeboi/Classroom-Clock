@@ -1,7 +1,6 @@
 /////////////////////////////////////////////////////////
 /*
   Jenna deBoisblanc
-  January 2016
   http://jdeboi.com/
 
   CLASSROOM CLOCK
@@ -32,7 +31,7 @@
 
 /////////////////////////////////////////////////////////
 // SET THIS
-int currentBlock = B_BLOCK;
+int currentBlock = H_BLOCK;
 /////////////////////////////////////////////////////////
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, PIN, NEO_GRB + NEO_KHZ800);
@@ -42,12 +41,6 @@ uint8_t currentPeriod = 0;
 uint8_t lastHour = 0;
 DateTime lastFlash;    // for countdown "flash"
 boolean flashOn = false;
-const byte numVacations = 9;
-uint16_t vacations[numVacations][3] = {
-  {2016, 9, 7}, 
-  {2016, 9, 14}, 
-  {2016, 9, 23}
-};
 
 uint8_t periods[7][4] = {
   {8, 0, 9, 0},   // Period 0: 8 - 9
@@ -98,6 +91,7 @@ void setup() {
   setPeriod();
   strip.begin();
   strip.show();
+  delay(5000);
 }
 
 void loop() {
@@ -200,7 +194,7 @@ uint16_t timeDiff(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
 boolean isEndFlash() {
   uint8_t h = periods[currentPeriod][2];
   uint8_t m = periods[currentPeriod][3];
-  if(timeDiff(now.hour(), now.minute(), h, m)  < 10) {
+  if(timeDiff(now.hour(), now.minute(), h, m)  < 6) {
     if(now.unixtime() - lastFlash.unixtime() > 4) {
       lastFlash = now;
       flashOn = !flashOn;
@@ -212,7 +206,7 @@ boolean isEndFlash() {
 
 boolean isSchoolDay() {
   if (now.dayOfWeek() > 4) return false;
-  else if (isVacation()) return false;
+  // else if (isVacation()) return false;
   return true;
 }
 
@@ -221,14 +215,14 @@ boolean isDuringSchool() {
   return false;
 }
 
-boolean isVacation() {
-  for (int i = 0; i < numVacations; i++) {
-    if(now.year() == vacations[i][0] && now.month() == vacations[i][1] && now.day() == vacations[i][2]) {
-      return true;
-    }
-  }
-  return false;
-}
+//boolean isVacation() {
+//  for (int i = 0; i < numVacations; i++) {
+//    if(now.year() == vacations[i][0] && now.month() == vacations[i][1] && now.day() == vacations[i][2]) {
+//      return true;
+//    }
+//  }
+//  return false;
+//}
 
 boolean isBetweenTime(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
   DateTime startTime (now.year(), now.month(), now.day(), h0, m0, 0);
@@ -286,13 +280,17 @@ boolean isEnd() {
 /////////////////////////////////////////////////////////
 void displayClock() {
   if(isEndOfDay()) nextDay();
-  else if (now.dayOfWeek() > 4) pulseClock(Wheel(250),10);
+  else if (isWeekend()) pulseClock(Wheel(250),10);
   else if (isBeforeSchool()) colorClock(Wheel(240));
   else if (isAfterSchool()) pulseClock(Wheel(100),5);
   else if (isEndFlash()) countdownClock(); 
   else if (isLunch()) pulseClock(Wheel(100),5);
   else if (isAssembly()) rainbowClock(5);
   else gradientClock();
+}
+
+boolean isWeekend() {
+  return now.dayOfWeek() > 4;
 }
 
 void displayColon(uint32_t c) {
@@ -312,7 +310,6 @@ void countdownClock() {
   DateTime endTime(now.year(), now.month(), now.day(), h, m, 0);
   uint8_t minLeft = (endTime.unixtime() - now.unixtime())/60;
   uint8_t secLeft = endTime.unixtime() - now.unixtime();
-  //Serial.println(minLeft);
   if(minLeft == 0) displayHour(minLeft, 0);
   else displayHour(minLeft, Wheel(190));
   displayMinute(secLeft, Wheel(190));
@@ -399,8 +396,9 @@ int getGradientColor(uint8_t h, uint8_t m) {
   uint8_t m1 = periods[currentPeriod][3];
   DateTime startTime(now.year(),now.month(),now.day(),h0,m0,0);
   DateTime endTime(now.year(),now.month(),now.day(),h1,m1,0); 
-  if(now.unixtime() < startTime.unixtime()) return 200;
-  else return map(now.unixtime(), startTime.unixtime(), endTime.unixtime(), 80, 0);
+  // not working if(now.unixtime() < startTime.unixtime()) return 200;
+  // not working else return map(now.unixtime(), startTime.unixtime(), endTime.unixtime(), 80, 0);
+  map(now.unixtime(), startTime.unixtime(), endTime.unixtime(), 80, 0);
 }
 
 void displayHour(uint8_t h, uint32_t col) {

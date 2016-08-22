@@ -1,0 +1,14 @@
+Type	Time Begins	Time Ends	Days of Week (blank signifies all days)	Name (optional)
+BLOCK	8:00 AM	9:00 AM		
+FREE	9:03 AM	9:48 AM		
+CLUB	9:48 AM	10:18 AM	W	
+ADVISORY	9:48 AM	10:18 AM	MTF	
+ASSEMBLY	9:48 AM	10:18 AM	Th	
+BLOCK	10:18 AM	11:03 AM		
+BLOCK	11:06 AM	11:51 AM		
+FREE	11:54 AM	12:39 PM		
+LUNCH	12:39 PM	1:24 PM		
+BLOCK	1:27 PM	2:12 PM		
+BLOCK	2:15 PM	3:00 PM		
+PRACTICE	3:15 PM	5:30 PM	T	Makerspace after school
+PRACTICE	3:15 AM	5:30 PM	Th	Robotics
