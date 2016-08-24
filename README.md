@@ -135,15 +135,12 @@ void displayClock() {
 }
 ```
 
-You can change the light effect by changing the function after the else if. Possible options include: colorClock(), pulseClock(), randoClock(), rainbowClock(), mardiGrasClock(), etc. Check the code for examples.
-
-You can change colors of some clocks (colorClock(), pulseClock, colorClock()) by changing the number in Wheel(). 0 is red and 255 is purple; experiment with values in between. 
-
-The number passed to rainbowClock() represents the speed that it cycles through the colors of the rainbow.
-
-countdownClock(), gradientClock(), xMasClock(), mardiGrasClock(), birthdayClock(), etc. don't take arguments (i.e. no values passed inside the parentheses).
-
-pulseCock() takes a color (passed inside Wheel()), and a number representing the amount of time to wait between pulses.
+## Clock functions
+- You can change the light effect by changing the function after the else if. Possible options include: colorClock(), pulseClock(), randoClock(), rainbowClock(), mardiGrasClock(), etc. Check the code for examples.
+- You can change colors of some clocks (colorClock(), pulseClock, colorClock()) by changing the number in Wheel(). 0 is red and 255 is purple; experiment with values in between. 
+- The number passed to rainbowClock() represents the speed that it cycles through the colors of the rainbow.
+- countdownClock(), gradientClock(), xMasClock(), mardiGrasClock(), birthdayClock(), etc. don't take arguments (i.e. no values passed inside the parentheses).
+- pulseCock() takes a color (passed inside Wheel()), and a number representing the amount of time to wait between pulses.
 
 Add your own functions! Feel free to do a pull request to add your functionality to the Classroom Clock!
 
