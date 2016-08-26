@@ -23,14 +23,13 @@
 #include <Wire.h>
 #include <SPI.h>
 #include "RTClib.h"               // https://github.com/adafruit/RTClib
-#include <RTC_DS1307.h>
 #include <avr/power.h>
 #include <Adafruit_NeoPixel.h>    // https://github.com/adafruit/Adafruit_NeoPixel
 
 #define PIN 3
 #define NUM_PIXELS 32
 
-#define DEBUG false
+#define DEBUG true
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, PIN, NEO_GRB + NEO_KHZ800);
 RTC_DS1307 RTC;
@@ -78,7 +77,7 @@ byte letters[] = {
 int extraDigitMode = 1;
 
 // setup for a rotating block schedule
-uint8_t currentBlock = D_BLOCK;
+uint8_t currentBlock = E_BLOCK;
 
 // this number should match the number of entries in classPeriods[]
 const uint8_t numClassPeriods = 7;
@@ -130,7 +129,8 @@ void setup() {
    * time with the function initChronoDot();
    * 
   */
-  initChronoDot();
+  initChronoDot(2016, 7, 26, 10, 9, 50);
+  //initChronoDot();
   strip.begin();
   strip.show();
 
@@ -140,16 +140,16 @@ void setup() {
    *  setPeriod() determines which period it currently is based on
    *  the current time. Blocks increment at the end of each period.
    */
-  setPeriod();
+  
 
   /*
    * Be careful about not drawing too much current from your USB.
-   * Make sure there's an external power supply, and to be really 
-   * careful, it might be a good idea to unplug after uploading code.
+   * I'm using a USB hub between the Arduino and laptop.
    * This delay is designed to give you time to upload and uplug
-   * before Neopixels come on.
+   * before Neopixels come on. 
    */
-  delay(5000);
+  delay(3000);
+  setPeriod();
 }
 
 void loop() {
@@ -172,7 +172,10 @@ void displayClock() {
   else if (isLunch()) colorClock(Wheel(150));
   else if (isAssembly()) rainbowClock(5);
   else if (isDuringClass()) gradientClock();
-  else colorClock(Wheel(200));
+  else {
+    Serial.println("between classes?");
+    colorClock(Wheel(200));
+  }
 }
 
 
@@ -196,10 +199,6 @@ void checkBlock() {
       }
     }
   }
-  if (DEBUG) {
-    Serial.print("Current block: ");
-    Serial.println(currentBlock);
-  }
 }
 
 // returns true if the first number is before the
@@ -218,7 +217,6 @@ boolean isAfterTime(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
 int timeDiff(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
   uint16_t t0 = h0 * 60 + m0;
   uint16_t t1 = h1 * 60 + m1;
-
   return t0 - t1;
 }
 
@@ -242,7 +240,7 @@ boolean isEndFlash() {
 
 boolean isSchoolDay() {
   // 0 = Sunday, 1 = Monday, ...., 6 = Saturday
-  if (now.dayOfWeek() == 0 || now.dayOfWeek() == 6) {
+  if (now.dayOfTheWeek() == 0 || now.dayOfTheWeek() == 6) {
     if (DEBUG) Serial.println("Weekend!");
     return false;
   }
@@ -266,7 +264,7 @@ boolean isBetweenTime(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
 }
 
 boolean isAssembly() {
-  if (isBetweenTime(otherBlocks[assemblyBlock][0], otherBlocks[assemblyBlock][1], otherBlocks[assemblyBlock][2], otherBlocks[assemblyBlock][2])) {
+  if (isBetweenTime(otherBlocks[assemblyBlock][0], otherBlocks[assemblyBlock][1], otherBlocks[assemblyBlock][2], otherBlocks[assemblyBlock][3])) {
     if (DEBUG) Serial.println("Assembly!");
     return true;
   }
@@ -274,7 +272,7 @@ boolean isAssembly() {
 }
 
 boolean isLunch() {
-  if (isBetweenTime(otherBlocks[lunchBlock][0], otherBlocks[lunchBlock][1], otherBlocks[lunchBlock][2], otherBlocks[lunchBlock][2])) {
+  if (isBetweenTime(otherBlocks[lunchBlock][0], otherBlocks[lunchBlock][1], otherBlocks[lunchBlock][2], otherBlocks[lunchBlock][3])) {
     if (DEBUG) Serial.println("Lunch!");
     return true;
   }
@@ -468,9 +466,12 @@ int getGradientColor(uint8_t h, uint8_t m) {
   uint8_t m1 = classPeriods[currentPeriod][3];
   DateTime startTime(now.year(), now.month(), now.day(), h0, m0, 0);
   DateTime endTime(now.year(), now.month(), now.day(), h1, m1, 0);
-  // not working if(now.unixtime() < startTime.unixtime()) return 200;
-  // not working else return map(now.unixtime(), startTime.unixtime(), endTime.unixtime(), 80, 0);
-  map(now.unixtime(), startTime.unixtime(), endTime.unixtime(), 80, 0);
+  if (DEBUG) {
+    Serial.print("Gradient Clock: ");
+    Serial.print(map(now.unixtime(), startTime.unixtime(), endTime.unixtime(), 0, 100));
+    Serial.println("% through period");
+  }
+  return map(now.unixtime(), startTime.unixtime(), endTime.unixtime(), 80, 0);
 }
 
 void displayHour(uint8_t h, uint32_t col) {
@@ -601,7 +602,7 @@ uint8_t getLetter() {
 void setPeriod() {
   currentPeriod = 0;
   for (int i = 0; i < numClassPeriods; i++ ) {
-    if (isBetweenTime(classPeriods[i][0], classPeriods[i][1], classPeriods[i][2], classPeriods[i][3])) {
+    if (isBeforeTime(now.hour(), now.minute(), classPeriods[i][2], classPeriods[i][3])) {
       currentPeriod = i;
       break;
     }
@@ -619,8 +620,6 @@ void nextDay() {
     if (currentBlock == 8) currentBlock = 0;
   }
 }
-
-
 
 void printClock() {
   Serial.print(now.hour());
