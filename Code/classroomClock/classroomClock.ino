@@ -29,13 +29,14 @@
 #define PIN 3
 #define NUM_PIXELS 32
 
-#define DEBUG true
+#define DEBUG false
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, PIN, NEO_GRB + NEO_KHZ800);
 RTC_DS1307 RTC;
 DateTime now;
 uint8_t currentPeriod = 0;
 uint8_t lastHour = 0;
+int currentOtherBlock = -1;
 DateTime lastFlash;    // for countdown "flash"
 boolean flashOn = false;
 byte numbers[] = {
@@ -77,7 +78,7 @@ byte letters[] = {
 int extraDigitMode = 1;
 
 // setup for a rotating block schedule
-uint8_t currentBlock = E_BLOCK;
+uint8_t currentBlock = F_BLOCK;
 
 // this number should match the number of entries in classPeriods[]
 const uint8_t numClassPeriods = 7;
@@ -97,7 +98,7 @@ uint8_t classPeriods[numClassPeriods][4] = {
 };
 
 // this number should match the number
-const uint8_t numOtherBlocks = 2;   
+const uint8_t numOtherBlocks = 2;
 
 // of entries in otherBlocks[]
 uint8_t otherBlocks[numOtherBlocks][4] = {
@@ -112,44 +113,47 @@ const uint8_t lunchBlock = 1;
 
 // number of minutes before end of class when countdown clock is triggered
 uint8_t countdownM = 6;
+uint8_t secBetweenFlashes = 4;
 
 /////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
 // THE GUTS
 /////////////////////////////////////////////////////////
 void setup() {
-  Serial.begin(57600);
-  
-  /* 
+  if (DEBUG) Serial.begin(57600);
+
+  /*
    * For testing purposes, you can set the clock to custom values, e.g.:
    * initChronoDot(year, month, day, hour, minute, seconds);
-   * initChronoDot(2016, 7, 26, 11, 47, 50);
-   * 
+   *
    * Otherwise, the clock automatically sets itself to your computer's
    * time with the function initChronoDot();
    * 
+   * initChronoDot(2016, 7, 26, 10, 13, 50);
+   *
   */
-  initChronoDot(2016, 7, 26, 10, 9, 50);
-  //initChronoDot();
+  
+  initChronoDot();
   strip.begin();
   strip.show();
 
-  /* 
+  /*
    *  Periods, unlike blocks, are only dependent on the time of
    *  day and increment from 0 to whatever the last period is.
    *  setPeriod() determines which period it currently is based on
    *  the current time. Blocks increment at the end of each period.
    */
-  
+  setPeriod();
 
   /*
-   * Be careful about not drawing too much current from your USB.
+   * Be careful about not drawing too much current from USB.
+   * I've uploaded code while external power supply was plugged in,
+   * but I'm not 100% sure this is the best practice. Right now
    * I'm using a USB hub between the Arduino and laptop.
    * This delay is designed to give you time to upload and uplug
-   * before Neopixels come on. 
+   * before Neopixels come on.
    */
   delay(3000);
-  setPeriod();
 }
 
 void loop() {
@@ -221,21 +225,40 @@ int timeDiff(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
 }
 
 boolean isEndFlash() {
-  uint8_t h = classPeriods[currentPeriod][2];
-  uint8_t m = classPeriods[currentPeriod][3];
-  if (timeDiff(h, m, now.hour(), now.minute())  < countdownM) {
-    if (DEBUG) {
-      Serial.print("End Flash: ");
-      Serial.print(timeDiff( h, m, now.hour(), now.minute()));
-      Serial.println(" minutes remaining");
+  if (isDuringClass()) {
+    uint8_t h = classPeriods[currentPeriod][2];
+    uint8_t m = classPeriods[currentPeriod][3];
+    if (timeDiff(h, m, now.hour(), now.minute())  < countdownM) {
+      if (DEBUG) {
+        Serial.print("End Flash: ");
+        Serial.print(timeDiff( h, m, now.hour(), now.minute()));
+        Serial.println(" minutes remaining");
+      }
+      if (now.unixtime() - lastFlash.unixtime() > secBetweenFlashes) {
+        lastFlash = now;
+        flashOn = !flashOn;
+      }
+      return flashOn;
     }
-    if (now.unixtime() - lastFlash.unixtime() > 4) {
-      lastFlash = now;
-      flashOn = !flashOn;
-    }
-    return flashOn;
+    return false;
   }
-  return false;
+  else if (isDuringOtherBlock()) {
+    uint8_t h = otherBlocks[currentOtherBlock][2];
+    uint8_t m = otherBlocks[currentOtherBlock][3];
+    if (timeDiff(h, m, now.hour(), now.minute())  < countdownM) {
+      if (DEBUG) {
+        Serial.print("End Flash: ");
+        Serial.print(timeDiff( h, m, now.hour(), now.minute()));
+        Serial.println(" minutes remaining");
+      }
+      if (now.unixtime() - lastFlash.unixtime() > 4) {
+        lastFlash = now;
+        flashOn = !flashOn;
+      }
+      return flashOn;
+    }
+    return false;
+  }
 }
 
 boolean isSchoolDay() {
@@ -325,10 +348,22 @@ boolean isEnd() {
 boolean isDuringClass() {
   for (int i = 0; i < numClassPeriods; i++ ) {
     if (isBetweenTime(classPeriods[i][0], classPeriods[i][1], classPeriods[i][2], classPeriods[i][3])) {
-      if (DEBUG) Serial.println("During Class!");
+      if (DEBUG) Serial.println("During class!");
       return true;
     }
   }
+  return false;
+}
+
+boolean isDuringOtherBlock() {
+  for (int i = 0; i < numOtherBlocks; i++ ) {
+    if (isBetweenTime(otherBlocks[i][0], otherBlocks[i][1], otherBlocks[i][2], otherBlocks[i][3])) {
+      currentOtherBlock = i;
+      if (DEBUG) Serial.println("During non-academic time block!");
+      return true;
+    }
+  }
+  currentOtherBlock = -1;
   return false;
 }
 
@@ -349,8 +384,16 @@ void displayColon(uint32_t c) {
 }
 
 void countdownClock() {
-  uint8_t h = classPeriods[currentPeriod][2];
-  uint8_t m = classPeriods[currentPeriod][3];
+  uint8_t h;
+  uint8_t m;
+  if (isDuringClass()) {
+    h = classPeriods[currentPeriod][2];
+    m = classPeriods[currentPeriod][3];
+  }
+  else if (isDuringOtherBlock()) {
+    h = otherBlocks[currentOtherBlock][2];
+    m = otherBlocks[currentOtherBlock][3];
+  }
   DateTime endTime(now.year(), now.month(), now.day(), h, m, 0);
   uint8_t minLeft = (endTime.unixtime() - now.unixtime()) / 60;
   uint8_t secLeft = (endTime.unixtime() - now.unixtime()) - minLeft * 60;
@@ -360,6 +403,8 @@ void countdownClock() {
   displayLetter(getLetter(), Wheel(190));
   displayColon(Wheel(190));
   strip.show();
+
+
 }
 
 void colorClock(int c) {
@@ -560,19 +605,21 @@ void initChronoDot() {
   Wire.begin();
   RTC.begin();
   // Check if the RTC is running.
-  if (! RTC.isrunning()) {
-    Serial.println("RTC is NOT running");
+  if (DEBUG) {
+    if (! RTC.isrunning()) {
+      Serial.println("RTC is NOT running");
+    }
   }
   // This section grabs the current datetime and compares it to
   // the compilation time.  If necessary, the RTC is updated.
   now = RTC.now();
   DateTime compiled = DateTime(__DATE__, __TIME__);
   if (now.unixtime() < compiled.unixtime()) {
-    Serial.println("RTC is older than compile time! Updating");
+    if (DEBUG) Serial.println("RTC is older than compile time! Updating");
     RTC.adjust(DateTime(__DATE__, __TIME__));
   }
   now = RTC.now();
-  Serial.println("Setup complete.");
+  if (DEBUG) Serial.println("Setup complete.");
 }
 
 // Use this function to set a specific initial DateTime
@@ -588,13 +635,13 @@ void initChronoDot(int y, int mon, int d, int h, int minu, int s) {
   now = RTC.now();
   RTC.adjust(DateTime(y, mon, d, h, minu, s));
   now = RTC.now();
-  Serial.println("Setup complete.");
+  if (DEBUG) Serial.println("Setup complete.");
 }
 
 uint8_t getLetter() {
-  if (extraDigitMode == 0) return 10;
-  else if (isAfterSchool()) return 10;
-  else if (!isSchoolDay()) return 10;
+  if (extraDigitMode == 0) return 9;
+  else if (!isSchoolDay()) return 9;
+  else if (isAfterSchool()) return 9;
   else if (extraDigitMode == 2) return currentPeriod + 1;
   else return currentBlock;
 }
@@ -622,10 +669,12 @@ void nextDay() {
 }
 
 void printClock() {
-  Serial.print(now.hour());
-  Serial.print(":");
-  Serial.print(now.minute());
-  Serial.print(":");
-  Serial.println(now.second());
+  if (DEBUG) {
+    Serial.print(now.hour());
+    Serial.print(":");
+    Serial.print(now.minute());
+    Serial.print(":");
+    Serial.println(now.second());
+  }
 }
 
