@@ -10,4 +10,13 @@
 #define G_BLOCK 6
 #define H_BLOCK 7
 
+#define ACADEMIC 0
+#define ASSEMBLY 1
+#define LUNCH 2
+
+
+
+
+
 #endif 
+

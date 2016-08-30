@@ -29,16 +29,20 @@
 #define PIN 3
 #define NUM_PIXELS 32
 
-#define DEBUG false
+#define DEBUG true
+#define SPEED_CLOCK true
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, PIN, NEO_GRB + NEO_KHZ800);
 RTC_DS1307 RTC;
 DateTime now;
 uint8_t currentPeriod = 0;
 uint8_t lastHour = 0;
-int currentOtherBlock = -1;
+uint8_t timeBlockIndex = 0;
+
 DateTime lastFlash;    // for countdown "flash"
 boolean flashOn = false;
+long lastSpeedTest = 0;
+
 byte numbers[] = {
   B11101110,    // 0
   B10001000,    // 1
@@ -78,38 +82,29 @@ byte letters[] = {
 int extraDigitMode = 1;
 
 // setup for a rotating block schedule
-uint8_t currentBlock = F_BLOCK;
+uint8_t currentBlock = A_BLOCK;
 
-// this number should match the number of entries in classPeriods[]
-const uint8_t numClassPeriods = 7;
+// this number should match the number of entries in schedule[]
+const uint8_t numTimeBlocks = 9;
 
-uint8_t classPeriods[numClassPeriods][4] = {
+uint8_t schedule[numTimeBlocks][5] = {
   // use 24 hour clock numbers even though this clock is a 12 hour clock
   // {starting hour, start min, end hour, end min}
-  {8, 0, 9, 0},       // Period 0: 8 - 9
-  {9, 3, 9, 48},      // Period 1: 9:03 - 9:48
-  // Assembly: 9:48 - 10:18
-  {10, 18, 11, 3},    // Period 2: 10:18 - 11:03
-  {11, 6, 11, 51},    // Period 3: 11:06 - 11:51
-  {11, 54, 12, 39},   // Period 4: 11:54 - 12:39
-  // Lunch: 12:39 - 1:24
-  {13, 27, 14, 12},   // Period 5: 1:27 - 2:12
-  {14, 15, 15, 0}     // Period 6: 2:15 - 3:00
+  {8, 0, 9, 0, ACADEMIC},       // 0 - Period 1: 8 - 9
+  {9, 3, 9, 48, ACADEMIC},      // 1 - Period 2: 9:03 - 9:48
+  {9, 48, 10, 18, ASSEMBLY},    // 2 - Assembly: 9:48 - 10:18
+  {10, 18, 11, 3, ACADEMIC},    // 3 - Period 3: 10:18 - 11:03
+  {11, 6, 11, 51, ACADEMIC},    // 4 - Period 4: 11:06 - 11:51
+  {11, 54, 12, 39, ACADEMIC},   // 5 - Period 5: 11:54 - 12:39
+  {12, 39, 13, 24, LUNCH},      // 6 - Lunch: 12:39 - 1:24
+  {13, 27, 14, 12, ACADEMIC},   // 7 - Period 6: 1:27 - 2:12
+  {14, 15, 15, 0, ACADEMIC}     // 8 - Period 7: 2:15 - 3:00
 };
 
-// this number should match the number
-const uint8_t numOtherBlocks = 2;
 
-// of entries in otherBlocks[]
-uint8_t otherBlocks[numOtherBlocks][4] = {
-  {9, 48, 10, 18},   // assembly: 9:48 - 10:18
-  {12, 39, 13, 24}  // Lunch: 12:39 - 1:24
-};
-
-// the next two values probably don't need to be changed
-// they represent their index in the otherBlocks array
-const uint8_t assemblyBlock = 0;
-const uint8_t lunchBlock = 1;
+// these are the array indicies of non-academic time blocks
+const uint8_t assemblyBlock = 2;
+const uint8_t lunchBlock = 6;
 
 // number of minutes before end of class when countdown clock is triggered
 uint8_t countdownM = 6;
@@ -121,45 +116,25 @@ uint8_t secBetweenFlashes = 4;
 /////////////////////////////////////////////////////////
 void setup() {
   if (DEBUG) Serial.begin(57600);
-
   /*
    * For testing purposes, you can set the clock to custom values, e.g.:
    * initChronoDot(year, month, day, hour, minute, seconds);
-   *
    * Otherwise, the clock automatically sets itself to your computer's
    * time with the function initChronoDot();
-   * 
-   * initChronoDot(2016, 7, 26, 10, 13, 50);
-   *
   */
-  
+  //initChronoDot(2016, 7, 26, 5, 38, 50);
   initChronoDot();
   strip.begin();
   strip.show();
-
-  /*
-   *  Periods, unlike blocks, are only dependent on the time of
-   *  day and increment from 0 to whatever the last period is.
-   *  setPeriod() determines which period it currently is based on
-   *  the current time. Blocks increment at the end of each period.
-   */
-  setPeriod();
-
-  /*
-   * Be careful about not drawing too much current from USB.
-   * I've uploaded code while external power supply was plugged in,
-   * but I'm not 100% sure this is the best practice. Right now
-   * I'm using a USB hub between the Arduino and laptop.
-   * This delay is designed to give you time to upload and uplug
-   * before Neopixels come on.
-   */
+  setSchedule();
   delay(3000);
 }
 
 void loop() {
   now = RTC.now();
-  displayClock();
+  if (isEndOfDay()) nextDay();
   checkBlock();
+  displayClock();
 }
 
 /////////////////////////////////////////////////////////
@@ -168,17 +143,16 @@ void loop() {
 /////////////////////////////////////////////////////////
 
 void displayClock() {
-  if (isEndOfDay()) nextDay();
-  else if (!isSchoolDay()) colorClock(Wheel(0));
-  else if (isBeforeSchool()) colorClock(Wheel(40));
+  if (!isSchoolDay()) colorClock(Wheel(0));
+  else if (isBeforeSchool()) pulseClock(Wheel(40), 5);
   else if (isAfterSchool()) colorClock(Wheel(100));
   else if (isEndFlash()) countdownClock();
-  else if (isLunch()) colorClock(Wheel(150));
+  else if (isLunch()) birthdayClock(300);
   else if (isAssembly()) rainbowClock(5);
   else if (isDuringClass()) gradientClock();
   else {
-    Serial.println("between classes?");
-    colorClock(Wheel(200));
+    //betweenClassCountdown
+    mardiGrasClock();
   }
 }
 
@@ -188,21 +162,57 @@ void displayClock() {
 // CHECK
 /////////////////////////////////////////////////////////
 void checkBlock() {
-  if (currentPeriod < numClassPeriods) {
-    uint8_t h = classPeriods[currentPeriod][2];
-    uint8_t m = classPeriods[currentPeriod][3];
+  if (timeBlockIndex < numTimeBlocks) {
+    uint8_t h = schedule[timeBlockIndex][2];
+    uint8_t m = schedule[timeBlockIndex][3];
     if (isAfterTime(now.hour(), now.minute(), h, m)) {
-      currentPeriod++;
-      currentBlock++;
-      if (currentBlock == 8) currentBlock = 0;
+      if (schedule[timeBlockIndex][4] == ACADEMIC) {
+        currentPeriod++;
+        currentBlock++;
+        if (currentBlock == 8) currentBlock = 0;
+        if (DEBUG) {
+          Serial.print("Academic period changed to: ");
+          Serial.print(currentPeriod);
+          Serial.print(" & block changed to: ");
+          Serial.println(currentBlock);
+        }
+      }
+      timeBlockIndex++;
       if (DEBUG) {
-        Serial.print(" Period changed to: ");
-        Serial.print(currentPeriod);
-        Serial.print(" & Block changed to: ");
-        Serial.println(currentBlock);
+        Serial.print("Time block index: ");
+        Serial.println(timeBlockIndex);
       }
     }
   }
+}
+
+int getCurrentPeriod() {
+  int period = -1;
+  if (isBeforeSchool() || isAfterSchool()) period = 0;
+  // check if it's before the end of an academic period
+  // if it's not during an academic period, find the next academic period
+  for (int i = 0; i < numTimeBlocks; i++ ) {
+    if (schedule[i][4] == ACADEMIC) {
+      period++;
+    }
+    if (isBeforeTime(now.hour(), now.minute(), schedule[i][2], schedule[i][3])) {
+      break;
+    }
+  }
+  return period;
+}
+
+int getCurrentTimeBlock() {
+  int tb = 0;
+  if (isBeforeSchool() || isAfterSchool()) tb = 0;
+  // check if it's before the end of an academic period
+  // if it's not during an academic period, find the next academic period
+  for (int i = 0; i < numTimeBlocks; i++ ) {
+    if (isBeforeTime(now.hour(), now.minute(), schedule[i][2], schedule[i][3])) {
+      return i;
+    }
+  }
+  return tb;
 }
 
 // returns true if the first number is before the
@@ -225,40 +235,29 @@ int timeDiff(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
 }
 
 boolean isEndFlash() {
+  uint8_t h;
+  uint8_t m;
   if (isDuringClass()) {
-    uint8_t h = classPeriods[currentPeriod][2];
-    uint8_t m = classPeriods[currentPeriod][3];
-    if (timeDiff(h, m, now.hour(), now.minute())  < countdownM) {
-      if (DEBUG) {
-        Serial.print("End Flash: ");
-        Serial.print(timeDiff( h, m, now.hour(), now.minute()));
-        Serial.println(" minutes remaining");
-      }
-      if (now.unixtime() - lastFlash.unixtime() > secBetweenFlashes) {
-        lastFlash = now;
-        flashOn = !flashOn;
-      }
-      return flashOn;
-    }
-    return false;
+    h = schedule[timeBlockIndex][2];
+    m = schedule[timeBlockIndex][3];
   }
-  else if (isDuringOtherBlock()) {
-    uint8_t h = otherBlocks[currentOtherBlock][2];
-    uint8_t m = otherBlocks[currentOtherBlock][3];
-    if (timeDiff(h, m, now.hour(), now.minute())  < countdownM) {
-      if (DEBUG) {
-        Serial.print("End Flash: ");
-        Serial.print(timeDiff( h, m, now.hour(), now.minute()));
-        Serial.println(" minutes remaining");
-      }
-      if (now.unixtime() - lastFlash.unixtime() > 4) {
-        lastFlash = now;
-        flashOn = !flashOn;
-      }
-      return flashOn;
-    }
-    return false;
+  else if (isBetweenTimeBlocks()) {
+    h = schedule[timeBlockIndex][0];
+    m = schedule[timeBlockIndex][1];
   }
+  if (timeDiff(h, m, now.hour(), now.minute())  < countdownM) {
+    if (DEBUG) {
+      Serial.print("End Flash: ");
+      Serial.print(timeDiff( h, m, now.hour(), now.minute()));
+      Serial.println(" minutes remaining");
+    }
+    if (now.unixtime() - lastFlash.unixtime() > secBetweenFlashes) {
+      lastFlash = now;
+      flashOn = !flashOn;
+    }
+    return flashOn;
+  }
+  return false;
 }
 
 boolean isSchoolDay() {
@@ -287,7 +286,7 @@ boolean isBetweenTime(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
 }
 
 boolean isAssembly() {
-  if (isBetweenTime(otherBlocks[assemblyBlock][0], otherBlocks[assemblyBlock][1], otherBlocks[assemblyBlock][2], otherBlocks[assemblyBlock][3])) {
+  if (isBetweenTime(schedule[assemblyBlock][0], schedule[assemblyBlock][1], schedule[assemblyBlock][2], schedule[assemblyBlock][3])) {
     if (DEBUG) Serial.println("Assembly!");
     return true;
   }
@@ -295,7 +294,7 @@ boolean isAssembly() {
 }
 
 boolean isLunch() {
-  if (isBetweenTime(otherBlocks[lunchBlock][0], otherBlocks[lunchBlock][1], otherBlocks[lunchBlock][2], otherBlocks[lunchBlock][3])) {
+  if (isBetweenTime(schedule[lunchBlock][0], schedule[lunchBlock][1], schedule[lunchBlock][2], schedule[lunchBlock][3])) {
     if (DEBUG) Serial.println("Lunch!");
     return true;
   }
@@ -305,7 +304,7 @@ boolean isLunch() {
 boolean isAfterSchool() {
   // You may need to edit these values if school ends with a homeroom or
   // otherBlock[] that isn't a classperiod[]
-  if (now.hour() >= classPeriods[numClassPeriods - 1][2] && now.minute() >=  classPeriods[numClassPeriods - 1][3]) {
+  if (now.hour() >= schedule[numTimeBlocks - 1][2] && now.minute() >=  schedule[numTimeBlocks - 1][3]) {
     if (DEBUG) Serial.println("After School!");
     return true;
   }
@@ -315,7 +314,7 @@ boolean isAfterSchool() {
 boolean isBeforeSchool() {
   // You may need to edit these values if school begins with a homeroom or
   // otherBlock[] that isn't a classperiod[]
-  if (now.hour() <= classPeriods[0][0] && now.minute() < classPeriods[0][1]) {
+  if (now.hour() <= schedule[0][0] && now.minute() < schedule[0][1]) {
     if (DEBUG) Serial.println("Before School!");
     return true;
   }
@@ -331,6 +330,9 @@ boolean isEndOfDay() {
   return changed;
 }
 
+boolean isBetweenTimeBlocks() {
+  return isDuringSchoolDay() && !isDuringTimeBlocks();
+}
 
 boolean isHourChange() {
   if (now.minute() == 0 && now.second() < 15) return true;
@@ -338,32 +340,36 @@ boolean isHourChange() {
 }
 
 boolean isEnd() {
-  uint8_t h = classPeriods[currentPeriod][2];
-  uint8_t m = classPeriods[currentPeriod][3];
+  uint8_t h = schedule[currentPeriod][2];
+  uint8_t m = schedule[currentPeriod][3];
   DateTime endTime (now.year(), now.month(), now.day(), h, m, 0);
   if (endTime.unixtime() - now.unixtime()  < 7 * 60) return true;
   return false;
 }
 
+boolean isDuringSchoolDay() {
+  return isSchoolDay() && !isAfterSchool() && !isBeforeSchool();
+}
+
 boolean isDuringClass() {
-  for (int i = 0; i < numClassPeriods; i++ ) {
-    if (isBetweenTime(classPeriods[i][0], classPeriods[i][1], classPeriods[i][2], classPeriods[i][3])) {
-      if (DEBUG) Serial.println("During class!");
-      return true;
+  for (int i = 0; i < numTimeBlocks; i++ ) {
+    if (isBetweenTime(schedule[i][0], schedule[i][1], schedule[i][2], schedule[i][3])) {
+      if (schedule[i][4] == ACADEMIC) {
+        if (DEBUG) Serial.println("During class!");
+        return true;
+      }
     }
   }
   return false;
 }
 
-boolean isDuringOtherBlock() {
-  for (int i = 0; i < numOtherBlocks; i++ ) {
-    if (isBetweenTime(otherBlocks[i][0], otherBlocks[i][1], otherBlocks[i][2], otherBlocks[i][3])) {
-      currentOtherBlock = i;
-      if (DEBUG) Serial.println("During non-academic time block!");
+boolean isDuringTimeBlocks() {
+  for (int i = 0; i < numTimeBlocks; i++ ) {
+    if (isBetweenTime(schedule[i][0], schedule[i][1], schedule[i][2], schedule[i][3])) {
+      if (DEBUG) Serial.println("During a time block!");
       return true;
     }
   }
-  currentOtherBlock = -1;
   return false;
 }
 
@@ -386,13 +392,13 @@ void displayColon(uint32_t c) {
 void countdownClock() {
   uint8_t h;
   uint8_t m;
-  if (isDuringClass()) {
-    h = classPeriods[currentPeriod][2];
-    m = classPeriods[currentPeriod][3];
+  if (isDuringTimeBlocks()) {
+    h = schedule[timeBlockIndex][2];
+    m = schedule[timeBlockIndex][3];
   }
-  else if (isDuringOtherBlock()) {
-    h = otherBlocks[currentOtherBlock][2];
-    m = otherBlocks[currentOtherBlock][3];
+  else if (isBetweenTimeBlocks()) {
+    h = schedule[timeBlockIndex][0];
+    m = schedule[timeBlockIndex][1];
   }
   DateTime endTime(now.year(), now.month(), now.day(), h, m, 0);
   uint8_t minLeft = (endTime.unixtime() - now.unixtime()) / 60;
@@ -403,8 +409,6 @@ void countdownClock() {
   displayLetter(getLetter(), Wheel(190));
   displayColon(Wheel(190));
   strip.show();
-
-
 }
 
 void colorClock(int c) {
@@ -433,7 +437,7 @@ void rainbowClock(int delayTime) {
 void birthdayClock(int delayTime) {
   displayHour(now.hour(), Wheel(random(0, 255)));
   displayMinute(now.minute(), Wheel(random(0, 255)));
-  displayLetter(0, Wheel(random(0, 255)));
+  displayLetter(getLetter(), Wheel(random(0, 255)));
   displayColon(Wheel(random(0, 255)));
   unsigned long t = millis();
   strip.show();
@@ -443,7 +447,7 @@ void birthdayClock(int delayTime) {
 void xmasClock() {
   displayHour(now.hour(), Wheel(0));
   displayMinute(now.minute(), Wheel(80));
-  displayLetter(1, Wheel(0));
+  displayLetter(getLetter(), Wheel(0));
   displayColon(Wheel(0));
   strip.show();
 }
@@ -451,7 +455,7 @@ void xmasClock() {
 void mardiGrasClock() {
   displayHour(now.hour(), Wheel(200));
   displayMinute(now.minute(), Wheel(80));
-  displayLetter(0, Wheel(50));
+  displayLetter(getLetter(), Wheel(50));
   displayColon(Wheel(50));
   strip.show();
 }
@@ -505,10 +509,10 @@ void gradientClock() {
 
 int getGradientColor(uint8_t h, uint8_t m) {
   // DateTime (year, month, day, hour, min, sec);
-  uint8_t h0 = classPeriods[currentPeriod][0];
-  uint8_t m0 = classPeriods[currentPeriod][1];
-  uint8_t h1 = classPeriods[currentPeriod][2];
-  uint8_t m1 = classPeriods[currentPeriod][3];
+  uint8_t h0 = schedule[timeBlockIndex][0];
+  uint8_t m0 = schedule[timeBlockIndex][1];
+  uint8_t h1 = schedule[timeBlockIndex][2];
+  uint8_t m1 = schedule[timeBlockIndex][3];
   DateTime startTime(now.year(), now.month(), now.day(), h0, m0, 0);
   DateTime endTime(now.year(), now.month(), now.day(), h1, m1, 0);
   if (DEBUG) {
@@ -646,23 +650,23 @@ uint8_t getLetter() {
   else return currentBlock;
 }
 
-void setPeriod() {
-  currentPeriod = 0;
-  for (int i = 0; i < numClassPeriods; i++ ) {
-    if (isBeforeTime(now.hour(), now.minute(), classPeriods[i][2], classPeriods[i][3])) {
-      currentPeriod = i;
-      break;
-    }
-  }
+void setSchedule() {
+  currentPeriod = getCurrentPeriod();
+  timeBlockIndex = getCurrentTimeBlock();
   if (DEBUG) {
-    Serial.print("Current period (#): ");
+    Serial.print("Current (starting) period is set to: ");
     Serial.println(currentPeriod);
+    Serial.print("Current (starting) time block index is set to: ");
+    Serial.println(timeBlockIndex);
   }
+
 }
+
 
 void nextDay() {
   if (isSchoolDay()) {
     currentPeriod = 0;
+    timeBlockIndex = 0;
     currentBlock++;
     if (currentBlock == 8) currentBlock = 0;
   }
