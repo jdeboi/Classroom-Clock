@@ -29,7 +29,7 @@
 #define PIN 3
 #define NUM_PIXELS 32
 
-#define DEBUG true
+#define DEBUG false
 #define SPEED_CLOCK true
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, PIN, NEO_GRB + NEO_KHZ800);
@@ -82,7 +82,7 @@ byte letters[] = {
 int extraDigitMode = 1;
 
 // setup for a rotating block schedule
-uint8_t currentBlock = A_BLOCK;
+uint8_t currentBlock = F_BLOCK;
 
 // this number should match the number of entries in schedule[]
 const uint8_t numTimeBlocks = 9;
@@ -101,6 +101,13 @@ uint8_t schedule[numTimeBlocks][5] = {
   {14, 15, 15, 0, ACADEMIC}     // 8 - Period 7: 2:15 - 3:00
 };
 
+// this number should match the number of entries in vacations[]
+const uint8_t numVacations = 3;
+uint8_t vacations[numVacations][3] = {
+  {2016, 1, 10},
+  {2016, 2, 20},
+  {2016, 3, 30}
+};
 
 // these are the array indicies of non-academic time blocks
 const uint8_t assemblyBlock = 2;
@@ -115,6 +122,7 @@ uint8_t secBetweenFlashes = 4;
 // THE GUTS
 /////////////////////////////////////////////////////////
 void setup() {
+  Serial.begin(57600);
   if (DEBUG) Serial.begin(57600);
   /*
    * For testing purposes, you can set the clock to custom values, e.g.:
@@ -122,7 +130,7 @@ void setup() {
    * Otherwise, the clock automatically sets itself to your computer's
    * time with the function initChronoDot();
   */
-  //initChronoDot(2016, 7, 26, 5, 38, 50);
+  //initChronoDot(2016, 7, 26, 14, 59, 50);
   initChronoDot();
   strip.begin();
   strip.show();
@@ -266,18 +274,18 @@ boolean isSchoolDay() {
     if (DEBUG) Serial.println("Weekend!");
     return false;
   }
-  // else if (isVacation()) return false;
+  else if (isVacation()) return false;
   return true;
 }
 
-//boolean isVacation() {
-//  for (int i = 0; i < numVacations; i++) {
-//    if(now.year() == vacations[i][0] && now.month() == vacations[i][1] && now.day() == vacations[i][2]) {
-//      return true;
-//    }
-//  }
-//  return false;
-//}
+boolean isVacation() {
+  for (int i = 0; i < numVacations; i++) {
+    if(now.year() == vacations[i][0] && now.month() == vacations[i][1] && now.day() == vacations[i][2]) {
+      return true;
+    }
+  }
+  return false;
+}
 
 boolean isBetweenTime(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
   DateTime startTime (now.year(), now.month(), now.day(), h0, m0, 0);
@@ -524,7 +532,8 @@ int getGradientColor(uint8_t h, uint8_t m) {
 }
 
 void displayHour(uint8_t h, uint32_t col) {
-  if (h > 12) h = h - 12;
+  if (h == 0) h = 12;
+  else if (h > 12) h -= 12;
   uint8_t firstDigit = h / 10;
   uint8_t secondDigit = h % 10;
   // TODO - this only works for non-military time
@@ -667,8 +676,6 @@ void nextDay() {
   if (isSchoolDay()) {
     currentPeriod = 0;
     timeBlockIndex = 0;
-    currentBlock++;
-    if (currentBlock == 8) currentBlock = 0;
   }
 }
 

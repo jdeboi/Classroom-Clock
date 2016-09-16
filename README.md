@@ -13,28 +13,47 @@ This clock is currently set up for 12-hour, [rotating block schedule] (https://g
 To add your own schedule, there are a number of changes. Look for the following section of code:
 
 ```c++
+////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
+// CUSTOMIZE THIS STUFF
 /////////////////////////////////////////////////////////
-// EDIT THESE
-/////////////////////////////////////////////////////////
-uint8_t currentBlock = H_BLOCK;   // setup for a rotating block schedule
 
-const uint8_t numPeriods = 7;     // this number should match the number
-                                  // of entries in classPeriods[]
+/*
+ * Set the functionality of the extra digit
+ * show nothing in the extra digit is mode 0
+ * show rotating block is mode 1
+ * show period number is mode 2
+*/
+int extraDigitMode = 1;
 
-uint8_t classPeriods[numPeriods][4] = {
+// setup for a rotating block schedule
+uint8_t currentBlock = A_BLOCK;
+
+// this number should match the number of entries in schedule[]
+const uint8_t numTimeBlocks = 9;
+
+uint8_t schedule[numTimeBlocks][5] = {
   // use 24 hour clock numbers even though this clock is a 12 hour clock
   // {starting hour, start min, end hour, end min}
-  {8, 0, 9, 0},       // Period 0: 8 - 9
-  {9, 3, 9, 48},      // Period 1: 9:03 - 9:48
-                      // Assembly: 9:48 - 10:18
-  {10, 18, 11, 3},    // Period 2: 10:18 - 11:03
-  {11, 6, 11, 51},    // Period 3: 11:06 - 11:51
-  {11, 54, 12, 39},   // Period 4: 11:54 - 12:39
-                      // Lunch: 12:39 - 1:24
-  {13, 27, 14, 12},   // Period 5: 1:27 - 2:12
-  {14, 15, 15, 0}     // Period 6: 2:15 - 3:00
+  {8, 0, 9, 0, ACADEMIC},       // 0 - Period 1: 8 - 9
+  {9, 3, 9, 48, ACADEMIC},      // 1 - Period 2: 9:03 - 9:48
+  {9, 48, 10, 18, ASSEMBLY},    // 2 - Assembly: 9:48 - 10:18
+  {10, 18, 11, 3, ACADEMIC},    // 3 - Period 3: 10:18 - 11:03
+  {11, 6, 11, 51, ACADEMIC},    // 4 - Period 4: 11:06 - 11:51
+  {11, 54, 12, 39, ACADEMIC},   // 5 - Period 5: 11:54 - 12:39
+  {12, 39, 13, 24, LUNCH},      // 6 - Lunch: 12:39 - 1:24
+  {13, 27, 14, 12, ACADEMIC},   // 7 - Period 6: 1:27 - 2:12
+  {14, 15, 15, 0, ACADEMIC}     // 8 - Period 7: 2:15 - 3:00
 };
+
+
+// these are the array indicies of non-academic time blocks
+const uint8_t assemblyBlock = 2;
+const uint8_t lunchBlock = 6;
+
+// number of minutes before end of class when countdown clock is triggered
+uint8_t countdownM = 6;
+uint8_t secBetweenFlashes = 4;
 ```
 
 Edit the classPeriods array to match your schedule. For example, if your first period starts at 7:45AM and ends at 8:45AM:
