@@ -82,7 +82,7 @@ byte letters[] = {
 int extraDigitMode = 1;
 
 // setup for a rotating block schedule
-uint8_t currentBlock = F_BLOCK;
+uint8_t currentBlock = D_BLOCK;
 
 // this number should match the number of entries in schedule[]
 const uint8_t numTimeBlocks = 9;
@@ -92,7 +92,7 @@ uint8_t schedule[numTimeBlocks][5] = {
   // {starting hour, start min, end hour, end min}
   {8, 0, 9, 0, ACADEMIC},       // 0 - Period 1: 8 - 9
   {9, 3, 9, 48, ACADEMIC},      // 1 - Period 2: 9:03 - 9:48
-  {9, 48, 10, 18, ASSEMBLY},    // 2 - Assembly: 9:48 - 10:18
+  {9, 48, 10, 15, ASSEMBLY},    // 2 - Assembly: 9:48 - 10:18
   {10, 18, 11, 3, ACADEMIC},    // 3 - Period 3: 10:18 - 11:03
   {11, 6, 11, 51, ACADEMIC},    // 4 - Period 4: 11:06 - 11:51
   {11, 54, 12, 39, ACADEMIC},   // 5 - Period 5: 11:54 - 12:39
@@ -130,7 +130,7 @@ void setup() {
    * Otherwise, the clock automatically sets itself to your computer's
    * time with the function initChronoDot();
   */
-  //initChronoDot(2016, 7, 26, 14, 59, 50);
+  //initChronoDot(2016, 11, 7, 1, 27, 50);
   initChronoDot();
   strip.begin();
   strip.show();
@@ -159,7 +159,7 @@ void displayClock() {
   else if (isAssembly()) rainbowClock(5);
   else if (isDuringClass()) gradientClock();
   else {
-    //betweenClassCountdown
+    //between classes 
     mardiGrasClock();
   }
 }
@@ -245,13 +245,16 @@ int timeDiff(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
 boolean isEndFlash() {
   uint8_t h;
   uint8_t m;
-  if (isDuringClass()) {
+  if (isDuringTimeBlocks()) {
     h = schedule[timeBlockIndex][2];
     m = schedule[timeBlockIndex][3];
   }
   else if (isBetweenTimeBlocks()) {
     h = schedule[timeBlockIndex][0];
     m = schedule[timeBlockIndex][1];
+  }
+  else {
+    return false;
   }
   if (timeDiff(h, m, now.hour(), now.minute())  < countdownM) {
     if (DEBUG) {
