@@ -101,7 +101,7 @@ uint8_t otherBlocks[numOtherBlocks][4] = {
 };
 
 const uint8_t assemblyBlock = 0;
-const uint8_t lunchBlock = 1; 
+const uint8_t lunchBlock = 1;
 const uint8_t homeroomBlock = 2;       // adding this
 ```
 If your school doesn't begin with an academic class (like a homeroom), you will need to change the "boolean isBeforeSchool()" function. IF it starts with the homeroom block from the previous example:
@@ -113,7 +113,7 @@ boolean isBeforeSchool() {
   return (now.hour() <= otherBlocks[homeroomBlock][0] && now.minute() < otherBlocks[homeroomBlock][1]);
 }
 ```
-There's probably other code editing you'll have to do for these types of schedule modifications. Please let me know (or submit pull requests) as your run into problems specific to your use case.
+There's probably other code editing you'll have to do for these types of schedule modifications. Please let me know (or submit pull requests) as you run into problems specific to your use case.
 
 To set the number of minutes before the countdown timer triggered, edit:
 
@@ -130,7 +130,7 @@ void displayClock() {
   else if (isWeekend()) pulseClock(Wheel(250),10);
   else if (isBeforeSchool()) colorClock(Wheel(240));
   else if (isAfterSchool()) pulseClock(Wheel(100),5);
-  else if (isEndFlash()) countdownClock(); 
+  else if (isEndFlash()) countdownClock();
   else if (isLunch()) pulseClock(Wheel(100),5);
   else if (isAssembly()) rainbowClock(5);
   else if (isDuringClass()) gradientClock();
@@ -146,7 +146,7 @@ void displayClock() {
   else if (isWeekend()) pulseClock(Wheel(250),10);
   else if (isBeforeSchool()) colorClock(Wheel(240));
   else if (isAfterSchool()) pulseClock(Wheel(100),5);
-  //else if (isEndFlash()) countdownClock(); 
+  //else if (isEndFlash()) countdownClock();
   else if (isLunch()) pulseClock(Wheel(100),5);
   else if (isAssembly()) rainbowClock(5);
   else if (isDuringClass()) gradientClock();
@@ -156,10 +156,9 @@ void displayClock() {
 
 ## Clock functions
 - You can change the light effect by changing the function after the else if. Possible options include: colorClock(), pulseClock(), randoClock(), rainbowClock(), mardiGrasClock(), etc. Check the code for examples.
-- You can change colors of some clocks (colorClock(), pulseClock, colorClock()) by changing the number in Wheel(). 0 is red and 255 is purple; experiment with values in between. 
+- You can change colors of some clocks (colorClock(), pulseClock, colorClock()) by changing the number in Wheel(). 0 is red and 255 is purple; experiment with values in between.
 - The number passed to rainbowClock() represents the speed that it cycles through the colors of the rainbow.
 - countdownClock(), gradientClock(), xMasClock(), mardiGrasClock(), birthdayClock(), etc. don't take arguments (i.e. no values passed inside the parentheses).
 - pulseCock() takes a color (passed inside Wheel()), and a number representing the amount of time to wait between pulses.
 
 Add your own functions! Feel free to do a pull request to add your functionality to the Classroom Clock!
-
