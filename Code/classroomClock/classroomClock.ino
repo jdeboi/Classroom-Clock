@@ -23,6 +23,7 @@
 #include <Wire.h>
 #include <SPI.h>
 #include "RTClib.h"               // https://github.com/adafruit/RTClib
+#include <RTC_DS1307.h>
 #include <avr/power.h>
 #include <Adafruit_NeoPixel.h>    // https://github.com/adafruit/Adafruit_NeoPixel
 
@@ -109,10 +110,6 @@ uint8_t vacations[numVacations][3] = {
   {2016, 3, 30}
 };
 
-// these are the array indicies of non-academic time blocks
-const uint8_t assemblyBlock = 2;
-const uint8_t lunchBlock = 6;
-
 // number of minutes before end of class when countdown clock is triggered
 uint8_t countdownM = 6;
 uint8_t secBetweenFlashes = 4;
@@ -130,7 +127,7 @@ void setup() {
    * Otherwise, the clock automatically sets itself to your computer's
    * time with the function initChronoDot();
   */
-  //initChronoDot(2016, 11, 7, 1, 27, 50);
+  // initChronoDot(2016, 11, 7, 15, 59, 50);
   initChronoDot();
   strip.begin();
   strip.show();
@@ -141,7 +138,7 @@ void setup() {
 void loop() {
   now = RTC.now();
   if (isEndOfDay()) nextDay();
-  checkBlock();
+  if (isSchoolDay()) checkBlock();
   displayClock();
 }
 
@@ -151,7 +148,8 @@ void loop() {
 /////////////////////////////////////////////////////////
 
 void displayClock() {
-  if (!isSchoolDay()) colorClock(Wheel(0));
+  if (isWeekend()) colorClock(Wheel(0));
+  else if (!isSchoolDay()) colorClock(Wheel(20));
   else if (isBeforeSchool()) pulseClock(Wheel(40), 5);
   else if (isAfterSchool()) colorClock(Wheel(100));
   else if (isEndFlash()) countdownClock();
@@ -159,7 +157,7 @@ void displayClock() {
   else if (isAssembly()) rainbowClock(5);
   else if (isDuringClass()) gradientClock();
   else {
-    //between classes 
+    //between classes
     mardiGrasClock();
   }
 }
@@ -272,13 +270,15 @@ boolean isEndFlash() {
 }
 
 boolean isSchoolDay() {
-  // 0 = Sunday, 1 = Monday, ...., 6 = Saturday
-  if (now.dayOfTheWeek() == 0 || now.dayOfTheWeek() == 6) {
-    if (DEBUG) Serial.println("Weekend!");
-    return false;
-  }
+  if (isWeekend()) return false;
   else if (isVacation()) return false;
   return true;
+}
+
+boolean isWeekend() {
+  // 0 = Sunday, 1 = Monday, ...., 6 = Saturday
+  if (now.dayOfWeek() == 0 || now.dayOfWeek() == 6) return true;
+  return false;
 }
 
 boolean isVacation() {
@@ -296,17 +296,17 @@ boolean isBetweenTime(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
   return (now.unixtime() >= startTime.unixtime() && now.unixtime() < endTime.unixtime());
 }
 
-boolean isAssembly() {
-  if (isBetweenTime(schedule[assemblyBlock][0], schedule[assemblyBlock][1], schedule[assemblyBlock][2], schedule[assemblyBlock][3])) {
-    if (DEBUG) Serial.println("Assembly!");
+boolean isLunch() {
+  if (schedule[timeBlockIndex][4] == LUNCH) {
+    if (DEBUG) Serial.println("Lunch!");
     return true;
   }
   return false;
 }
 
-boolean isLunch() {
-  if (isBetweenTime(schedule[lunchBlock][0], schedule[lunchBlock][1], schedule[lunchBlock][2], schedule[lunchBlock][3])) {
-    if (DEBUG) Serial.println("Lunch!");
+boolean isAssembly() {
+  if (schedule[timeBlockIndex][4] == ASSEMBLY) {
+    if (DEBUG) Serial.println("Assembly!");
     return true;
   }
   return false;
@@ -580,17 +580,17 @@ void displayMinute(uint8_t m, uint32_t col) {
 }
 
 void displayLetter(uint8_t letter, uint32_t col) {
-  if (letter < 8) {
-    for (int i = 0; i < 7; i++) {
-      if (letters[letter] & (1 << 7 - i)) strip.setPixelColor(i, col);
-      else strip.setPixelColor(i, 0);
-    }
-  }
-  else {
-    for (int i = 0; i < 7; i++) {
-      strip.setPixelColor(i, 0);
-    }
-  }
+//  if (letter < 8) {
+//    for (int i = 0; i < 7; i++) {
+//      if (letters[letter] & (1 << 7 - i)) strip.setPixelColor(i, col);
+//      else strip.setPixelColor(i, 0);
+//    }
+//  }
+//  else {
+//    for (int i = 0; i < 7; i++) {
+//      strip.setPixelColor(i, 0);
+//    }
+//  }
 }
 
 // Input a value 0 to 255 to get a color value.
@@ -691,4 +691,3 @@ void printClock() {
     Serial.println(now.second());
   }
 }
-

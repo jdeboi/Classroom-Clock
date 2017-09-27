@@ -5,7 +5,7 @@
   http://jdeboi.com/
 
   CLASSROOM CLOCK with tone()
-  A customization to the CLASSROOM CLOCK: adding a sound 
+  A customization to the CLASSROOM CLOCK: adding a sound
   when the countdown timer is triggered.
 
 */
@@ -17,6 +17,7 @@
 #include <Wire.h>
 #include <SPI.h>
 #include "RTClib.h"               // https://github.com/adafruit/RTClib
+#include <RTC_DS1307.h>
 #include <avr/power.h>
 #include <Adafruit_NeoPixel.h>    // https://github.com/adafruit/Adafruit_NeoPixel
 
@@ -36,6 +37,7 @@ uint8_t timeBlockIndex = 0;
 DateTime lastFlash;    // for countdown "flash"
 boolean flashOn = false;
 long lastSpeedTest = 0;
+boolean playedTone = false;
 
 byte numbers[] = {
   B11101110,    // 0
@@ -68,15 +70,15 @@ byte letters[] = {
 /////////////////////////////////////////////////////////
 
 /*
- * Set the functionality of the extra digit
- * show nothing in the extra digit is mode 0
- * show rotating block is mode 1
- * show period number is mode 2
+   Set the functionality of the extra digit
+   show nothing in the extra digit is mode 0
+   show rotating block is mode 1
+   show period number is mode 2
 */
 int extraDigitMode = 1;
 
 // setup for a rotating block schedule
-uint8_t currentBlock = D_BLOCK;
+uint8_t currentBlock = A_BLOCK;
 
 // this number should match the number of entries in schedule[]
 const uint8_t numTimeBlocks = 9;
@@ -117,14 +119,13 @@ uint8_t secBetweenFlashes = 4;
 /////////////////////////////////////////////////////////
 void setup() {
   Serial.begin(57600);
-  if (DEBUG) Serial.begin(57600);
   /*
-   * For testing purposes, you can set the clock to custom values, e.g.:
-   * initChronoDot(year, month, day, hour, minute, seconds);
-   * Otherwise, the clock automatically sets itself to your computer's
-   * time with the function initChronoDot();
+     For testing purposes, you can set the clock to custom values, e.g.:
+     initChronoDot(year, month, day, hour, minute, seconds);
+     Otherwise, the clock automatically sets itself to your computer's
+     time with the function initChronoDot();
   */
-  //initChronoDot(2016, 11, 7, 1, 27, 50);
+  //initChronoDot(2016, 11, 7, 8, 54, 50);
   initChronoDot();
   strip.begin();
   strip.show();
@@ -153,7 +154,7 @@ void displayClock() {
   else if (isAssembly()) rainbowClock(5);
   else if (isDuringClass()) gradientClock();
   else {
-    //between classes 
+    //between classes
     mardiGrasClock();
   }
 }
@@ -228,11 +229,24 @@ boolean isAfterTime(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
   return false;
 }
 
+boolean isAfterTime(uint8_t h0, uint8_t m0, uint8_t s0, uint8_t h1, uint8_t m1, uint8_t s1) {
+  if (timeDiff(h0, m0, s0, h1, m1, s0) >= 0) return true;
+  return false;
+}
+
 // returns the difference in minutes
 // later time first
 int timeDiff(uint8_t h0, uint8_t m0, uint8_t h1, uint8_t m1) {
   uint16_t t0 = h0 * 60 + m0;
   uint16_t t1 = h1 * 60 + m1;
+  return t0 - t1;
+}
+
+// returns the difference in seconds
+// later time first
+int timeDiff(uint8_t h0, uint8_t m0, uint8_t s0, uint8_t h1, uint8_t m1, uint8_t s1) {
+  uint16_t t0 = h0 * 60 * 60 + m0 * 60 + s0;
+  uint16_t t1 = h1 * 60 * 60 + m1 * 60 + s1;
   return t0 - t1;
 }
 
@@ -251,9 +265,10 @@ boolean isEndFlash() {
     return false;
   }
   if (timeDiff(h, m, now.hour(), now.minute())  < countdownM) {
-    DateTime playTime (now.year(), now.month(), now.day(), h, m-countdownM, 40);
-    if (now.unixtime() < playTime.unixtime()) {
-      tone(8, NOTE_G6, 500);
+    if (!playedTone) {
+      Serial.println("tone!");
+      alarm();
+      playedTone = true;
     }
     if (DEBUG) {
       Serial.print("End Flash: ");
@@ -266,12 +281,13 @@ boolean isEndFlash() {
     }
     return flashOn;
   }
+  playedTone = false;
   return false;
 }
 
 boolean isSchoolDay() {
   // 0 = Sunday, 1 = Monday, ...., 6 = Saturday
-  if (now.dayOfTheWeek() == 0 || now.dayOfTheWeek() == 6) {
+  if (now.dayOfWeek() == 0 || now.dayOfWeek() == 6) {
     if (DEBUG) Serial.println("Weekend!");
     return false;
   }
@@ -281,7 +297,7 @@ boolean isSchoolDay() {
 
 boolean isVacation() {
   for (int i = 0; i < numVacations; i++) {
-    if(now.year() == vacations[i][0] && now.month() == vacations[i][1] && now.day() == vacations[i][2]) {
+    if (now.year() == vacations[i][0] && now.month() == vacations[i][1] && now.day() == vacations[i][2]) {
       return true;
     }
   }
@@ -680,5 +696,25 @@ void printClock() {
     Serial.print(":");
     Serial.println(now.second());
   }
+}
+
+/*
+ * Pass a time that you'd like the alarm to go off
+ * as well as the amount of time (alarmSeconds) that you'd like it to go off
+ */
+void checkCustomAlarm(int hr, int mn, int sec, int alarmSeconds) {
+  DateTime startAlarm (now.year(), now.month(), now.day(), hr, mn, sec);
+  if (now.unixtime() > startAlarm.unixtime() && now.unixtime() < startAlarm.unixtime() + alarmSeconds) {
+    alarm(); 
+  }
+}
+
+void alarm() {
+  int melody [] = {NOTE_G6, NOTE_B6, NOTE_A6, NOTE_G6, NOTE_B5};
+  for (int i = 0; i < 5; i++) {
+    tone(8, melody[i], 500);
+    delay(800);
+  }
+  noTone(8);
 }
 
