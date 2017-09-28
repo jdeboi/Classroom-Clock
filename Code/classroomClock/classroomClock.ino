@@ -28,7 +28,7 @@
 #include <Adafruit_NeoPixel.h>    // https://github.com/adafruit/Adafruit_NeoPixel
 
 #define PIN 3
-#define NUM_PIXELS 32
+#define NUM_PIXELS 55
 
 #define DEBUG false
 #define SPEED_CLOCK true
@@ -45,15 +45,15 @@ boolean flashOn = false;
 long lastSpeedTest = 0;
 
 byte numbers[] = {
-  B11101110,    // 0
-  B10001000,    // 1
-  B01111100,    // 2     5555
-  B11011100,    // 3   6     4
-  B10011010,    // 4     3333
-  B11010110,    // 5   2     0
-  B11110110,    // 6     1111
-  B10001100,    // 7
-  B11111110,    // 8
+  B11101110,    // 0              What should change if I want my setup to use 14 leds, instead of 7, ie: two for each segment,
+  B10001000,    // 1                                         like the one on the right?
+  B01111100,    // 2     5555                11 10
+  B11011100,    // 3   6     4             12      9
+  B10011010,    // 4     3333              13      8
+  B11010110,    // 5   2     0                6  7
+  B11110110,    // 6     1111               5      0
+  B10001100,    // 7                        4      1
+  B11111110,    // 8                          3  2
   B10011110    // 9
 };
 byte letters[] = {
